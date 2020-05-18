@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OscillatorAndOSCControl</title>
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+
+<body>
+    This is an oscillator with frequency/amplitude controls available via moving the sliders, or using 'Max' patch.
+    Works in Node server.
+    <br>
+    <button id="start" onclick="startOsc(500)">Start</button>
+    <button id="stop" onclick="off()">Stop</button>
+    <br><br>
+    <input type="range" id="frequency" min="50" max="4000"> <br>
+    <br>Frequency Value: <span id="freqValue"></span>
+    <br><br><br>
+    <input type="range" id="amp" min="0" max="1.0" step="0.01"> <br>
+    <br>Amplitude Value: <span id="ampValue"></span>
+
+    <script>
+        //This is DOM side of the code, where the socket receives the OSC message from Node server. 
+        var start = document.getElementById('start');
+        var stop = document.getElementById('stop');
+        var freq = document.getElementById('frequency');
+        var amp = document.getElementById('amp');
+        var freqValue = document.getElementById('freqValue');
+        var ampValue = document.getElementById('ampValue');
+        var context;
+        var oscillator, gain;
+        var socket = io('http://localhost:8000');
+
+        //Check the first lesson codes
+        init();
+        function init() {
+            try {
+                window.AudioContext = window.AudioContext || window.webkitAudioContext;
+                context = new AudioContext();
+            }
+            catch (e) {
+                alert('Web Audio API is not supported in this browser');
+            }
+        }
+
+        function startOsc() {
+            //Compare with the first lesson code. We change the order of the code a bit in order for the OSC values to be applied to Frequency and Gain.
+
+            // Create OscillatorNode
+            // Create sound source
+            oscillator = context.createOscillator();
+            // Create gain node
+            gain = context.createGain();
+
+            //Slider actions to the values
+            freq.oninput = function () {
+                //Also to print the value 
+                freqValue.innerHTML = this.value;
+                //And this is to apply the slider value to the oscillator frequency.
+                oscillator.frequency.value = this.value;
+            }
+            amp.oninput = function () {
+                //print the value
+                ampValue.innerHTML = this.value;
+                //And this is to apply the slider value to the oscillator gain.
+                gain.gain.value = this.value;
+            }
+
+            // Receive osc message from the server
+            socket.on('osc', function (data) {
+                console.log(data);
+                //map the received osc message to frequency and amplitude
+                freq.value = data.x;//apply to the slider
+                amp.value = data.y;//apply to the slider
+                freqValue.innerHTML = data.x; //print the osc data
+                ampValue.innerHTML = data.y;//print the osc data
+                console.log(freq.value);
+               
+               
+
+                oscillator.type = 'square'; // square wave
+                oscillator.frequency.value = freq.value;//Apply the osc data to the frequency     
+                gain.gain.value = data.y;      //Apply the osc data to the amp    
+            });
+
+            oscillator.start(0);//Start the oscillator
+            oscillator.connect(gain); // Connect oscillator to gain
+            gain.connect(context.destination); // Connect gain to output
+
+        };
+        function off() {
+            oscillator.stop(0); // Stop oscillator after 0 seconds
+            oscillator.disconnect(); // Disconnect oscillator so it can be picked up by browser’s garbage collector
+        }
+    </script>
+</body>
+
+</html>

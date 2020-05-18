@@ -1,0 +1,120 @@
+
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html> <head>
+<title>WebAudio OSC Output Example - 2 Variables</title>
+<!-- By Scott Hawley @drscotthawley.  Modified from https://github.com/automata/osc-web/blob/master/web-side/app.html
+No additional license restrictions are introduced with these modifications; the automata/osc-web site gives no license info.  
+Thus as far as this author is concerned: "unlimited license": feel free to use & modify in any way you wish!  -->
+</head>
+
+<body>
+<h2>WebAudio OSC Output Example - 2 Variables</h2>
+
+<p>Following <a href="https://www.jroehm.com/2015/10/a-simple-guide-to-use-osc-in-the-browser/">instructions
+by Juergen Rohm</a>, I grabbed the <a href="https://github.com/automata/osc-web">Open Sound Control Web Bridge</a>
+and hooked it up to some WebAudio code for controlling the frequency of an oscillator.</p>
+
+<p>To use it, follow the instructions on either Juergen's page or the OSC-Web github page, and run the bridge app. ("node bridge.js").
+Then just open this HTML page.<p>
+
+<p><i>Note that reloading the web page typically causes the OSC bridge server to crash, so you'll need to re-run it.</i></p>
+<br>
+<hr/>
+<div>Listening on port 12000 (<a href="http://www.wekinator.org/">Wekinator</a> default).<br>First input adjusts the frequency, second input adjusts the gain.<div>
+
+<p>Received Wekinator OSC message: <span id="status"></span></p>
+<p>Current frequency is:<span id="frequency"></span> Hz<br>
+Current gain is:<span id="gain"></span></p>
+
+<hr />
+<p>--<a href="http://drscotthawley.github.io">Scott Hawley</a></p>
+
+
+<!-- <script src="http://127.0.0.1:8081/socket.io/socket.io.js"></script> -->
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    //==================== WebSocket-handling Code ============
+   socket = io.connect('http://localhost', { port: 8081, rememberTransport: false});
+   console.log('oi');
+   socket.on('connect', function() {
+        // sends to socket.io server the host/port of oscServer
+        // and oscClient
+        socket.emit('config',
+            {
+                server: {
+                    port: 12000,        // listens on this port
+                    host: '127.0.0.1'
+                },
+                client: {
+                    port: 3334,       // sends on this port (unused)
+                    host: '127.0.0.1'
+                }
+            }
+        );
+    });
+
+
+
+  //==================== Main WebAudio-handling Code ============
+  if ((window.AudioContext === undefined) && (window.webkitAudioContext === undefined)) {
+                //return
+    	alert('The Web Audio API is not supported in your browser!');
+
+        }
+
+  // create web audio api context
+  var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  // create Oscillator and gain node
+  var oscillator = audioCtx.createOscillator();
+  var gainNode = audioCtx.createGain();
+
+  // connect oscillator -> gain node -> 'speakers'
+  oscillator.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+
+  // Choices for initial frequency and volume
+  var initialFreq = 440;                  // value in Hertz
+  var initialGain = 0.2;                  // tip: Don't start it too loud
+
+  // Assign options for the oscillator
+  oscillator.type = 'sine';
+  oscillator.frequency.value = initialFreq;
+
+  oscillator.start(0);                    // Play the tone
+
+  gainNode.gain.value = initialGain;       // Note that we waited until after the osc. was started to "turn up" the gain
+
+  //=============================== end main Webaudio code
+
+
+  //==============  When we get a socket message ==============
+  socket.on('message', function(obj) {
+      var status = document.getElementById("status");
+      // status[0] is the message name (from wekinator), the other elements of status are the values
+      msg_name = obj[0]
+      if ('/wek/outputs' == msg_name) {
+          
+        status.innerHTML = obj             // update the 'status' display with what was received.
+          
+        freq_factor = obj[1] / 0.5        // Middle of Wekinator range will leave freq at Initial value
+        gain_factor = obj[2] / 0.5        // Middle of Wekinator range will leave gain at Initial value
+
+        // Change the oscillator values
+        oscillator.frequency.value = initialFreq * freq_factor
+        gainNode.gain.value = initialGain * gain_factor
+
+        // Update the display
+        frequency.innerHTML = oscillator.frequency.value         
+        gain.innerHTML = gainNode.gain.value
+      } else {
+        console.log('Ignoring non-Wekinator socket message:'+obj);
+      }
+   });    // end of socket.on
+
+</script>
+
+<!--- Unused: <button onclick="socket.emit('message', '/foobar');">Send OSC message</button>  -->
+
+</body> </html>
+
